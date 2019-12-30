@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -75,8 +76,10 @@ var associations map[string][]Ingredient
 const recipeFn = "recipes.json"
 
 func init() {
+	dir := path.Dir(os.Args[0])
+
 	// Read the file
-	f, err := os.Open(recipeFn)
+	f, err := os.Open(path.Join(dir, recipeFn))
 	if err != nil {
 		panic(err)
 	}
@@ -141,15 +144,15 @@ func Random() Cocktail {
 
 		var choice Ingredient
 	dedupe:
-		for i := 0; i < len(choices); i++ { // Avoid repeated ingredients
-			choice = choices[rand.Intn(len(choices))]
+		for _, i := range rand.Perm(len(choices)) {
+			choice = choices[i]
 
 			if choice.Name == "" {
 				continue
 			}
 
-			for _, i := range out.Ingredients {
-				if choice.PrintedName() == i.PrintedName() {
+			for _, j := range out.Ingredients {
+				if choice.PrintedName() == j.PrintedName() {
 					continue dedupe
 				}
 			}
@@ -166,8 +169,8 @@ func Random() Cocktail {
 		ingredient := out.Ingredients[rand.Intn(len(out.Ingredients))]
 
 	pick:
-		for i := 0; i < len(recipes); i++ {
-			c := recipes[rand.Intn(len(recipes))]
+		for _, i := range rand.Perm(len(recipes)) {
+			c := recipes[i]
 			for _, j := range c.Ingredients {
 				if ingredient.PrintedName() == j.PrintedName() {
 					parts := strings.Split(c.Name, " ")
@@ -182,8 +185,44 @@ func Random() Cocktail {
 	return out
 }
 
-func Handler() (Cocktail, error) {
-	return Random(), nil
+func Handler() (output map[string]interface{}, err error) {
+	output = map[string]interface{}{
+		"headers": map[string]string{
+			"Access-Control-Allow-Origin":  "*",
+			"Access-Control-Allow-Methods": "*",
+			"Access-Control-Allow-Headers": "*",
+		},
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			output["statusCode"] = 500
+			output["body"] = fmt.Sprint(r)
+
+			err = fmt.Errorf("%v", r)
+		}
+
+		fmt.Println(output)
+	}()
+
+	c := Random()
+
+	ingredients := make([]string, len(c.Ingredients))
+	for i, ingredient := range c.Ingredients {
+		ingredients[i] = ingredient.String()
+	}
+
+	var body []byte
+	body, err = json.Marshal(map[string]interface{}{
+		"name":        c.Name,
+		"ingredients": ingredients,
+	})
+
+	output["statusCode"] = 200
+	output["body"] = string(body)
+	output["headers"].(map[string]string)["Content-Type"] = "application/json"
+
+	return
 }
 
 func main() {

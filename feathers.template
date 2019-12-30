@@ -1,0 +1,18 @@
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: feathers
+      Runtime: go1.x
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: get
+
+Outputs:
+  Uri:
+    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
